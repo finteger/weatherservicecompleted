@@ -8,8 +8,11 @@ const Image = require('./image.js');
 const Video = require('./video.js');
 const ejs = require('ejs');
 const Joi = require('joi');
+const axios = require('axios');
 const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const mcache = require('memory-cache');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const multer = require('multer');
@@ -140,6 +143,19 @@ video.save();
 
 });
 
+
+//High-level middleware function to rate-limit API requests
+
+const apiLimiter = rateLimit({
+    windowsMS: 1 * 60 * 1000, //15 minutes
+    max: 2, 
+    standardHeaders: true, 
+    legacyHeaders: false,
+});
+
+
+
+
 //High level middleware function that verifies jwt.  Authorized access if session info matches decoded token info.
 function authenticateToken(req, res, next){
  const token = req.cookies.jwt;
@@ -160,6 +176,30 @@ function authenticateToken(req, res, next){
     res.status(401).send('You are not authorized to access this page.');
  }
 }
+
+
+//High-level middleware to cache pages in memory.
+
+var cache = (duration) => {
+return (req, res, next) =>{
+    let key = '__express__' + req.originalUrl || req.url;
+    let cachedBody = mcache.get(key);
+    if(cachedBody){
+        res.send(cachedBody);
+        return;
+    } else {
+        res.sendResponse = res.send;
+        res.send = (body) =>{
+            mcache.put(key, body, duration * 1000);
+            res.sendResponse(body);
+        }
+     next();
+    }
+
+}
+}
+
+
 
 
 //Route to display weather data
@@ -199,10 +239,39 @@ try {
 });
 
 
-//Route to display all weather data in HTML by passing data variables
-app.get('/view', async (req, res) =>{
+//Route to display API documentation
+app.get('/documentation', (req, res) => {
 
     try {
+       res.render('documentation.ejs');
+    } catch (error) {
+       res.status(500).send('Server error.'); 
+    }
+
+});
+
+
+
+
+
+
+//Route to display all weather data in HTML by passing data variables
+app.get('/view', cache(100), async (req, res) =>{
+
+    try {
+
+
+        let data;
+        const access_token = 'ONOaTPRoDWOkcohZEjwkouOwIOHWrsFT';
+        
+        axios.get('https://www.ncei.noaa.gov/cdo-web/api/v2/locations?limit=5', {
+            headers: {
+              'token': `${access_token}`
+            }
+          }).then(res => {
+            data = res.data;
+        });
+
 
         const imager = await Image.find();
         const images = imager.map(image => {
@@ -224,7 +293,7 @@ app.get('/view', async (req, res) =>{
           });
         const weatherData = await Weather.find();
 
-        res.render('view.ejs', { weatherData, images, videos});
+        res.render('view.ejs', { weatherData, images, videos, data});
 
 
 
@@ -237,7 +306,7 @@ app.get('/view', async (req, res) =>{
 
 
 //Route to display all weather data in JSON
-app.get('/api/all', async (req, res) =>{
+app.get('/api/all', apiLimiter,  async (req, res) =>{
 
     try {
         const weatherData = await Weather.find();
@@ -249,7 +318,7 @@ app.get('/api/all', async (req, res) =>{
 
 });
 // Route to display all weather videos
-app.get('/api/videos', async (req, res) => {
+app.get('/api/videos', apiLimiter,  async (req, res) => {
     try {
       const videos = await Video.find();
       const individualVideo = videos.map(video => {
@@ -267,7 +336,7 @@ app.get('/api/videos', async (req, res) => {
   });
   
   // Route to display all weather images
-  app.get('/api/images', async (req, res) => {
+  app.get('/api/images', apiLimiter,  async (req, res) => {
     try {
       const images = await Image.find();
       const individualImage = images.map(image => {
@@ -398,8 +467,11 @@ req.session.destroy((err) =>{
 });
 
 
+
+
+
 //Define the port number
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 
 
 //Start the server

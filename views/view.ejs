@@ -15,7 +15,15 @@ button {
 		#login-btn {
 			margin-right: 10px;
 		}
-    
+    #alert{
+      background-color: red;
+      color: white;
+      padding: 20px;
+    }
+    #doc-btn{
+      margin-left:15px;
+
+    }
   </style>
 <head>
   <link rel="stylesheet" href="/style.css">
@@ -31,16 +39,30 @@ button {
     <h1 class="mt-3"><img id="logo" src="/images/download.png"><img>Weather Service</h1>
     <a href="/login"><button id="login-btn">Login</button></a>
 		<a href="/register"><button id="register-btn">Register</button></a>
+    <a href="/documentation"><button id="doc-btn">Documentation</button></a>
 
    
     
     <h2 style="background:lightblue;padding:10px;width:100%;border-radius:10px;"><i class="fa-solid fa-bolt-lightning" style="color:yellow"></i>&nbsp;Latest Weather Uploads:</h2>
-
+    <div id="alert"><strong>ALERT:&nbsp;&nbsp;</strong>Travel advisory for central region and surrounding areas.  Please avoid non-essential travel.
+      <ul>
+        <% data.results.forEach((result) => { %>
+          <li>
+            <p>mindate: <%= result.mindate %></p>
+            <p>maxdate: <%= result.maxdate %></p>
+            <p>name: <%= result.name %></p>
+            <p>datacoverage: <%= result.datacoverage %></p>
+            <p>id: <%= result.id %></p>
+          </li>
+        <% }); %>
+      </ul>
+    
+    </div>
 
     <div style="display: flex; justify-content: left; align-items: left; overflow-x: auto;margin:50px">
       <% videos.forEach((video) => { %>
         <div style="margin: 10px; padding: 10px; background-color: lightblue; border-radius: 25px;">
-          <video controls width="320" height="240" autoplay muted>
+          <video  width="320" height="240" autoplay muted>
             <source src="data:<%= video.contentType %>;base64,<%= video.data.toString('base64') %>" type="<%= video.contentType %>">
           </video>
                   
