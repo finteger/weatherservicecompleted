@@ -24,6 +24,36 @@ button {
       margin-left:15px;
 
     }
+    #messages {
+    text-align: center;
+  }
+
+  #input {
+    display: block;
+    margin: 0 auto;
+  }
+
+  #send {
+    display: block;
+    margin: 10px auto;
+  }
+
+  #close {
+    display: block;
+    margin: 10px auto;
+  }
+  #messages-container {
+    height: 300px;
+    overflow-y: scroll;
+    margin-bottom: 10px;
+  }
+
+  .message {
+    background-color: #f1f1f1;
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+  }
   </style>
 <head>
   <link rel="stylesheet" href="/style.css">
@@ -44,21 +74,19 @@ button {
    
     
     <h2 style="background:lightblue;padding:10px;width:100%;border-radius:10px;"><i class="fa-solid fa-bolt-lightning" style="color:yellow"></i>&nbsp;Latest Weather Uploads:</h2>
-    <div id="alert"><strong>ALERT:&nbsp;&nbsp;</strong>Travel advisory for central region and surrounding areas.  Please avoid non-essential travel.
+    <div id="alert">
       <ul>
-        <% data.results.forEach((result) => { %>
-          <li>
-            <p>mindate: <%= result.mindate %></p>
-            <p>maxdate: <%= result.maxdate %></p>
-            <p>name: <%= result.name %></p>
-            <p>datacoverage: <%= result.datacoverage %></p>
-            <p>id: <%= result.id %></p>
-          </li>
-        <% }); %>
+        <% if (messageType && headline && sender) { %>
+          <p>Message Type: <%= messageType %></p>
+          <p>Headline: <%= headline %></p>
+          <p>Sender: <%= sender %></p>
+        <% } else { %>
+          <p>No active weather alerts at this time.</p>
+        <% } %>
       </ul>
-    
     </div>
 
+    
     <div style="display: flex; justify-content: left; align-items: left; overflow-x: auto;margin:50px">
       <% videos.forEach((video) => { %>
         <div style="margin: 10px; padding: 10px; background-color: lightblue; border-radius: 25px;">
@@ -145,5 +173,53 @@ button {
       }
     });
   </script>
+
+<center><h2>WebSocket Weather Service Chat Room</h2></center>
+
+<div id="messages-container">
+  <div id="messages"></div>
+</div>
+
+<input id="input" type="text" />
+<button id="send">Send</button>
+<button id="close">Close Connection</button>
+
+
+<script>
+  const socket = new WebSocket('ws://localhost:8080');
+  const messagesDiv = document.getElementById('messages');
+
+  socket.addEventListener('open', (event) => {
+    console.log('WebSocket connection opened');
+  });
+
+  socket.addEventListener('message', async (event) => {
+    const blob = await event.data;
+    const message = await blob.text(); // convert blob to string
+    console.log(`Received message: ${message}`);
+
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message');
+    messageElement.innerText = message;
+    messagesDiv.appendChild(messageElement);
+
+    // Scroll to the bottom of the messages container
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+
+  const sendButton = document.getElementById('send');
+  const inputField = document.getElementById('input');
+
+  sendButton.addEventListener('click', () => {
+    const message = inputField.value;
+    socket.send(message);
+    inputField.value = '';
+  });
+
+  const closeButton = document.getElementById('close');
+  closeButton.addEventListener('click', () => {
+    socket.close();
+  });
+</script>
 </body>
 </html>
