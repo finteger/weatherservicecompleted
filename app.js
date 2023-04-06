@@ -8,10 +8,10 @@ const Image = require('./image.js');
 const Video = require('./video.js');
 const ejs = require('ejs');
 const Joi = require('joi');
-const axios = require('axios');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
 const mcache = require('memory-cache');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
@@ -253,55 +253,58 @@ app.get('/documentation', (req, res) => {
 
 
 
-
-
 //Route to display all weather data in HTML by passing data variables
-app.get('/view', cache(100), async (req, res) =>{
+app.get('/view', cache(100),  async (req, res) =>{
 
+    let messageType;
+    let headline;
+    let sender;
+    const access_token = 'ONOaTPRoDWOkcohZEjwkouOwIOHWrsFT';
+    
     try {
-
-
-        let data;
-        const access_token = 'ONOaTPRoDWOkcohZEjwkouOwIOHWrsFT';
-        
-        axios.get('https://www.ncei.noaa.gov/cdo-web/api/v2/locations?limit=5', {
-            headers: {
-              'token': `${access_token}`
-            }
-          }).then(res => {
-            data = res.data;
-        });
-
-
-        const imager = await Image.find();
-        const images = imager.map(image => {
-          return {
-            name: image.name,
-            desc: image.desc,
-            data: image.img.data.toString('base64')
-          };
-        });
- 
-        const videor = await Video.find();
-        const videos = videor.map(video => {
-            return {
-              name: video.name,
-              desc: video.desc,
-              data: video.vid.data.toString('base64'),
-              contentType: video.vid.contentType
-            };
-          });
-        const weatherData = await Weather.find();
-
-        res.render('view.ejs', { weatherData, images, videos, data});
-
-
-
+      const response = await axios.get('https://api.weather.gov/alerts/active?', {
+        headers: {
+          'token': `${access_token}`
+        }
+      });
+      const alertData = response.data.features[0].properties;
+      messageType = alertData.messageType;
+      headline = alertData.headline;
+      sender = alertData.senderName;
+      console.log(messageType, headline, sender);
     } catch (error) {
-        console.error(error);
-        res.status(500).send('An error occurred while retrieving weather data.');
+      console.error(error);
     }
-})
+    
+    const imager = await Image.find();
+    const images = imager.map(image => {
+      return {
+        name: image.name,
+        desc: image.desc,
+        data: image.img.data.toString('base64')
+      };
+    });
+    
+    const videor = await Video.find();
+    const videos = videor.map(video => {
+      return {
+        name: video.name,
+        desc: video.desc,
+        data: video.vid.data.toString('base64'),
+        contentType: video.vid.contentType
+      };
+    });
+    const weatherData = await Weather.find();
+    
+    res.render('view.ejs', {
+      weatherData,
+      images,
+      videos,
+      messageType,
+      headline,
+      sender
+    });
+});
 
 
 
@@ -470,12 +473,37 @@ req.session.destroy((err) =>{
 
 
 
-//Define the port number
-const port = process.env.PORT || 8080;
+
+const http = require('http');
+const WebSocket = require('ws');
 
 
-//Start the server
-app.listen(port, () => {
-console.log(`Weather service listening on port ${port}`);
+
+// Create a HTTP server using the Express app
+const server = http.createServer(app);
+
+// Create a WebSocket server
+const wss = new WebSocket.Server({ server });
+
+// Define an event handler for new WebSocket connections
+wss.on('connection', (ws) => {
+  console.log('New WebSocket connection');
+
+  // Define an event handler for WebSocket messages
+  ws.on('message', (message) => {
+    console.log(`Received message: ${message}`);
+
+    // Broadcast the message to all connected clients
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
+  });
 });
 
+// Start the server
+const port = process.env.PORT || 8080;
+server.listen(port, () => {
+  console.log(`WebSocket chat room listening on port ${port}`);
+});
